@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forensic Solo Burnrate Analyzer (Gist Cloud-Sync)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { surface: { 50: '#F8FAFC', 100: '#F1F5F9', 800: '#1E293B', 900: '#0F172A' } } } }
+    }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .privacy-blur .blur-target { filter: blur(6px); transition: filter 0.2s; user-select: none; }
+    .privacy-blur .blur-target:hover { filter: blur(0px); }
+  </style>
+</head>
+<body class="bg-surface-900 text-slate-100 min-h-screen flex flex-col" id="app-root">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-surface-900/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 p-2 rounded-xl text-white">
+          <i data-lucide="terminal" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-sm tracking-tight flex items-center gap-2">
+            Forensic Burnrate Auditor <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">GIST-CLOUD</span>
+          </h1>
+          <p class="text-[11px] text-slate-400">Persistente ovunque via GitHub Gist • Cancella pure il PC</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="App.openCloudModal()" class="px-3 py-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-600/30 transition flex items-center gap-1.5">
+          <i data-lucide="cloud" class="w-3.5 h-3.5"></i> Cloud Gist Sync
+        </button>
+        <button onclick="App.togglePrivacyBlur()" title="Privacy Blur (Ctrl+Shift+P)" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-300 transition">
+          <i data-lucide="eye-off" id="blur-icon" class="w-4 h-4"></i>
+        </button>
+        <button onclick="App.loadSampleData()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition">Demo Data</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Cloud Gist Modal -->
+  <div id="cloud-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-surface-800 border border-slate-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl text-xs">
+      <h3 class="font-semibold text-sm">GitHub Gist Cloud Sync</h3>
+      <p class="text-slate-400">Salva/carica lo stato su un Gist GitHub. Indipendente dal PC, cancellabile in locale senza perdere nulla.</p>
+      <div class="space-y-2">
+        <label class="block text-slate-300 font-medium">Gist ID (es. c123456789...)</label>
+        <input type="text" id="gist-id" placeholder="Incolla Gist ID qui..." class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
+      </div>
+      <div class="space-y-2">
+        <label class="block text-slate-300 font-medium">GitHub Token (opzionale, solo per Gist privati)</label>
+        <input type="password" id="gist-token" placeholder="ghp_... (lascia vuoto se pubblico)" class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="App.saveToGist()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-medium text-white">Salva su Gist</button>
+        <button onclick="App.loadFromGist()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium text-white">Carica da Gist</button>
+      </div>
+      <div class="flex justify-between items-center text-slate-500 pt-2 border-t border-slate-700">
+        <span id="cloud-status">Pronto</span>
+        <button onclick="document.getElementById('cloud-modal').classList.add('hidden')" class="text-slate-300 hover:underline">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
+    <!-- Dropzone -->
+    <div id="dropzone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-5 bg-surface-800/40 text-center transition cursor-pointer"
+         ondragover="App.handleDragOver(event)" ondragleave="App.handleDragLeave(event)" ondrop="App.handleDrop(event)" onclick="document.getElementById('csvInput').click()">
+      <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="App.handleFileSelect(event)">
+      <div class="flex items-center justify-center gap-3">
+        <i data-lucide="database-backup" class="w-6 h-6 text-indigo-400"></i>
+        <div class="text-left">
+          <p class="text-sm font-medium">Trascina CSV bancario (Revolut, Intesa, Amex, Generico)</p>
+          <p class="text-xs text-slate-500">Ricorda di fare "Salva su Gist" dopo l'import per renderlo indipendente dal PC!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forensic KPI Matrix -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 privacy-blur">
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
+        <span class="text-[11px] text-slate-400">Liquidità Iniziale Est.</span>
+        <div class="text-lg font-bold mt-0.5 blur-target" id="kpi-basebal">€ 4.500,00</div>
+      </div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
+        <span class="text-[11px] text-slate-400">True Disposable (Safe Burn)</span>
+        <div class="text-lg font-bold mt-0.5 text-emerald-400 blur-target" id="kpi-true-disposable">€ 0,00</div>
+      </div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
+        <span class="text-[11px] text-slate-400">Burn Gior. Variabile (30g)</span>
+        <div class="text-lg font-bold mt-0.5 text-amber-400 blur-target" id="kpi-burnrate">€ 0,00/g</div>
+      </div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
+        <span class="text-[11px] text-slate-400">Weekend vs Weekday Index</span>
+        <div class="text-lg font-bold mt-0.5 text-indigo-400" id="kpi-wknd-index">0% WE</div>
+      </div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
+        <span class="text-[11px] text-slate-400">Runway Reale</span>
+        <div class="flex items-center gap-1.5 mt-0.5">
+          <span class="text-lg font-bold blur-target" id="kpi-runway">0 gg</span>
+          <span id="kpi-runway-badge" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-700">N/D</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-slate-800 space-x-6 text-sm font-medium">
+      <button class="pb-3 border-b-2 border-indigo-500 text-white" onclick="App.switchTab('tx', this)">Transazioni & Dedup (<span id="count-tx">0</span>)</button>
+      <button class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" onclick="App.switchTab('forensic', this)">Forensic & Sinking Funds</button>
+    </div>
+
+    <!-- Tab TX -->
+    <div id="tab-tx" class="space-y-4">
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl overflow-x-auto privacy-blur">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-surface-900/50 text-slate-400 border-b border-slate-700/60">
+            <tr>
+              <th class="p-3">Data</th>
+              <th class="p-3">Merchant Normalizzato</th>
+              <th class="p-3">Categoria Granulare</th>
+              <th class="p-3 text-right">Importo</th>
+            </tr>
+          </thead>
+          <tbody id="tx-table-body" class="divide-y divide-slate-700/40"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab Forensic -->
+    <div id="tab-forensic" class="hidden space-y-4">
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 space-y-3">
+        <h3 class="font-semibold text-sm">Envelope Accrual (Sinking Funds Annuali)</h3>
+        <div id="sinking-list" class="space-y-2 text-xs"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const CATEGORIES = [
+      'Alimentari / Spesa', 'Bar / Caffetteria / Colazione', 'Ristoranti / Pizzerie', 'Food Delivery (Glovo/JustEat)',
+      'Utenze (Luce/Gas/Acqua)', 'Internet / Telefonia / Mobile', 'Abbonamenti SaaS / Cloud / Soft', 'Abbonamenti Streaming / Media',
+      'Trasporti Pubblici / Mezzi', 'Carburante / Pedaggi / Parcheggi', 'Auto (Manutenzione / Bollo / Assicurazione)',
+      'Viaggi / Hotel / Voli', 'Salute / Farmacia / Medico', 'Abbigliamento / Scarpe / Accessori',
+      'Casa / Arredo / Elettrodomestici / Fai da te', 'Formazione / Libri / Corsi', 'Svago / Cinema / Eventi / Gaming',
+      'Investimenti / Broker / Crypto', 'Donazioni / Beneficenza', 'Entrate Stipendio / Salario',
+      'Entrate Extra / Rimborsi / Cashback', 'Altro / Varie'
+    ];
+    const DEFAULT_RULES = [
+      { pattern: /AMZN|AMAZON/i, merchant: 'Amazon', cat: 'Casa / Arredo / Elettrodomestici / Fai da te' },
+      { pattern: /NETFLIX/i, merchant: 'Netflix', cat: 'Abbonamenti Streaming / Media' },
+      { pattern: /SPOTIFY/i, merchant: 'Spotify', cat: 'Abbonamenti Streaming / Media' },
+      { pattern: /ESSELUNGA|COOP|CARREFOUR|CONAD/i, merchant: 'Supermercato', cat: 'Alimentari / Spesa' }
+    ];
+
+    const App = {
+      transactions: JSON.parse(localStorage.getItem('zc_tx') || '[]'),
+      seenHashes: new Set(JSON.parse(localStorage.getItem('zc_hashes') || '[]')),
+      overrides: JSON.parse(localStorage.getItem('zc_overrides') || '{}'),
+      sinkingFunds: JSON.parse(localStorage.getItem('zc_sinking') || JSON.stringify([{ name: 'Assicurazione Auto', annual: 600 }])),
+      privacyBlurActive: false,
+
+      init() {
+        lucide.createIcons();
+        document.getElementById('gist-id').value = localStorage.getItem('zc_gist_id') || '';
+        document.getElementById('gist-token').value = localStorage.getItem('zc_gist_token') || '';
+        this.renderAll();
+      },
+
+      saveStorage() {
+        localStorage.setItem('zc_tx', JSON.stringify(this.transactions));
+        localStorage.setItem('zc_hashes', JSON.stringify(Array.from(this.seenHashes)));
+        localStorage.setItem('zc_overrides', JSON.stringify(this.overrides));
+        localStorage.setItem('zc_sinking', JSON.stringify(this.sinkingFunds));
+      },
+
+      renderAll() {
+        this.processTransactions();
+        this.renderKPIs();
+        this.renderTxTable();
+        this.renderSinkingFunds();
+        this.saveStorage();
+      },
+
+      openCloudModal() { document.getElementById('cloud-modal').classList.remove('hidden'); },
+
+      getStatePayload() {
+        return {
+          transactions: this.transactions,
+          seenHashes: Array.from(this.seenHashes),
+          overrides: this.overrides,
+          sinkingFunds: this.sinkingFunds
+        };
+      },
+
+      applyStatePayload(data) {
+        if (data.transactions) this.transactions = data.transactions;
+        if (data.seenHashes) this.seenHashes = new Set(data.seenHashes);
+        if (data.overrides) this.overrides = data.overrides;
+        if (data.sinkingFunds) this.sinkingFunds = data.sinkingFunds;
+        this.renderAll();
+      },
+
+      async saveToGist() {
+        const gistId = document.getElementById('gist-id').value.trim();
+        const token = document.getElementById('gist-token').value.trim();
+        localStorage.setItem('zc_gist_id', gistId);
+        localStorage.setItem('zc_gist_token', token);
+        if (!token) { alert('Per salvare su Gist serve un token GitHub (ghp_...) con permessi gist.'); return; }
+        document.getElementById('cloud-status').innerText = 'Salvataggio in corso...';
+        try {
+          const body = {
+            description: 'Burnrate Analyzer Cloud Backup',
+            files: { 'burnrate_backup.json': { content: JSON.stringify(this.getStatePayload(), null, 2) } }
+          };
+          const url = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
+          const method = gistId ? 'PATCH' : 'POST';
+          const res = await fetch(url, {
+            method,
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const json = await res.json();
+          if (json.id) {
+            document.getElementById('gist-id').value = json.id;
+            localStorage.setItem('zc_gist_id', json.id);
+            document.getElementById('cloud-status').innerText = 'Salvato su Gist con ID: ' + json.id;
+          } else { document.getElementById('cloud-status').innerText = 'Errore salvataggio Gist'; }
+        } catch(e) { document.getElementById('cloud-status').innerText = 'Errore di rete'; }
+      },
+
+      async loadFromGist() {
+        const gistId = document.getElementById('gist-id').value.trim();
+        const token = document.getElementById('gist-token').value.trim();
+        if (!gistId) { alert('Inserisci un Gist ID'); return; }
+        document.getElementById('cloud-status').innerText = 'Caricamento da Gist...';
+        try {
+          const headers = token ? { 'Authorization': `token ${token}` } : {};
+          const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
+          const json = await res.json();
+          const file = json.files && json.files['burnrate_backup.json'];
+          if (file) {
+            const data = JSON.parse(file.content);
+            this.applyStatePayload(data);
+            document.getElementById('cloud-status').innerText = 'Caricato con successo!';
+          } else { document.getElementById('cloud-status').innerText = 'File non trovato nel Gist'; }
+        } catch(e) { document.getElementById('cloud-status').innerText = 'Errore caricamento'; }
+      },
+
+      handleFileSelect(e) { if (e.target.files[0]) this.parseFile(e.target.files[0]); },
+      handleDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('border-indigo-500'); },
+      handleDragLeave(e) { document.getElementById('dropzone').classList.remove('border-indigo-500'); },
+      handleDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('border-indigo-500'); if (e.dataTransfer.files[0]) this.parseFile(e.dataTransfer.files[0]); },
+      parseFile(file) { Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => this.ingestRawRows(res.data) }); },
+
+      ingestRawRows(rows) {
+        rows.forEach(r => {
+          const dateStr = r['Data Contabile'] || r['Completed Date'] || r['Data'] || Object.values(r)[0];
+          const rawDesc = r['Descrizione Operazione'] || r['Description'] || r['Descrizione'] || Object.values(r)[1] || '';
+          const amountStr = r['Importo'] || r['Amount'] || Object.values(r).find(v => typeof v === 'string' && (v.includes(',') || v.includes('.'))) || '0';
+          const normDate = this.normDate(dateStr);
+          const normAmt = this.normNumber(amountStr);
+          const signature = `${normDate}|${this.stripNoise(rawDesc).toUpperCase()}|${normAmt.toFixed(2)}`;
+          if (!this.seenHashes.has(signature)) {
+            this.seenHashes.add(signature);
+            this.transactions.push({ id: 'tx_' + Math.random().toString(36).substr(2,7), date: normDate, rawDesc, amount: normAmt });
+          }
+        });
+        this.renderAll();
+      },
+
+      normNumber(val) {
+        if (typeof val === 'number') return val;
+        let c = String(val).replace(/€|\s+/g, '');
+        if (c.includes(',') && c.indexOf(',') > c.lastIndexOf('.')) c = c.replace(/\./g, '').replace(',', '.');
+        else if (c.includes(',')) c = c.replace(',', '.');
+        return parseFloat(c) || 0;
+      },
+      normDate(d) {
+        if (!d) return '1970-01-01';
+        if (d.includes('/')) { const p = d.split('/'); if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; }
+        return d.substring(0,10);
+      },
+      stripNoise(desc) { return desc.replace(/POS C\/O\s+/gi, '').replace(/LUX|IT\*\w+/gi, '').trim(); },
+
+      processTransactions() {
+        this.processedTx = this.transactions.map(t => {
+          let merchant = this.stripNoise(t.rawDesc);
+          let defaultCat = t.amount > 0 ? 'Entrate Extra / Rimborsi / Cashback' : 'Altro / Varie';
+          if (t.amount > 0 && /STIPENDIO|SALARIO/i.test(t.rawDesc)) defaultCat = 'Entrate Stipendio / Salario';
+          let cat = this.overrides[t.id] || defaultCat;
+          for (let r of DEFAULT_RULES) { if (r.pattern.test(t.rawDesc) || r.pattern.test(merchant)) { merchant = r.merchant; cat = r.cat; } }
+          return { ...t, cleanMerchant: merchant, category: cat };
+        }).sort((a,b) => b.date.localeCompare(a.date));
+      },
+
+      renderKPIs() {
+        const netFlow = this.processedTx.reduce((a, t) => a + t.amount, 0);
+        const currentBalance = 4500.00 + netFlow;
+        document.getElementById('kpi-basebal').innerText = `€ ${currentBalance.toLocaleString('it-IT', {minimumFractionDigits: 2})}`;
+        const varSpend30 = this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate') && !t.category.includes('Abbonamenti')).reduce((a, t) => a + Math.abs(t.amount), 0);
+        const dailyBurn = varSpend30 / 30;
+        document.getElementById('kpi-burnrate').innerText = `€ ${dailyBurn.toFixed(2)}/g`;
+        const trueDisposable = Math.max(0, (currentBalance * 0.3) - 50 - 250);
+        document.getElementById('kpi-true-disposable').innerText = `€ ${trueDisposable.toFixed(2)}/mo`;
+
+        let weSpend = 0, wkSpend = 0;
+        this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate')).forEach(t => {
+          const day = new Date(t.date).getDay();
+          if (day === 0 || day === 6) weSpend += Math.abs(t.amount); else wkSpend += Math.abs(t.amount);
+        });
+        const wePct = (weSpend + wkSpend) > 0 ? Math.round((weSpend / (weSpend + wkSpend)) * 100) : 0;
+        document.getElementById('kpi-wknd-index').innerText = `${wePct}% WE`;
+
+        const runwayDays = dailyBurn > 0 ? Math.round(currentBalance / dailyBurn) : 999;
+        document.getElementById('kpi-runway').innerText = runwayDays > 365 ? '365+ gg' : `${runwayDays} gg`;
+        const badge = document.getElementById('kpi-runway-badge');
+        badge.className = `px-1.5 py-0.5 rounded text-[9px] font-bold ${runwayDays < 30 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`;
+        badge.innerText = runwayDays < 30 ? 'WARN' : 'SAFE';
+      },
+
+      renderTxTable() {
+        document.getElementById('count-tx').innerText = this.processedTx.length;
+        document.getElementById('tx-table-body').innerHTML = this.processedTx.map(t => `
+          <tr class="hover:bg-surface-800/50">
+            <td class="p-3 text-slate-400">${t.date}</td>
+            <td class="p-3 font-medium text-slate-100">${t.cleanMerchant}</td>
+            <td class="p-3">
+              <select class="bg-surface-900 border border-slate-700 rounded px-2 py-0.5 text-xs max-w-[200px]" onchange="App.setOverride('${t.id}', this.value)">
+                ${CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+            </td>
+            <td class="p-3 text-right font-mono ${t.amount >= 0 ? 'text-emerald-400' : 'text-slate-100'} blur-target">
+              ${t.amount.toLocaleString('it-IT', style: 'currency', currency: 'EUR')}
+            </td>
+          </tr>
+        `).join('');
+      },
+
+      setOverride(id, cat) { this.overrides[id] = cat; this.renderAll(); },
+      renderSinkingFunds() {
+        document.getElementById('sinking-list').innerHTML = this.sinkingFunds.map(sf => `
+          <div class="flex justify-between items-center bg-surface-900/60 p-2 rounded border border-slate-700/40">
+            <span>${sf.name}</span><span class="font-mono text-indigo-400">€ ${sf.annual}/yr</span>
+          </div>
+        `).join('');
+      },
+      switchTab(id) {
+        ['tx', 'forensic'].forEach(t => document.getElementById('tab-' + t).classList.add('hidden'));
+        document.getElementById('tab-' + id).classList.remove('hidden');
+      },
+      loadSampleData() {
+        this.ingestRawRows([
+          { 'Data Contabile': '15/09/2026', 'Descrizione Operazione': 'POS C/O ESSELUNGA MILANO LUX', 'Importo': '-84,50' },
+          { 'Data Contabile': '12/09/2026', 'Descrizione Operazione': 'NETFLIX.COM PAYMENT', 'Importo': '-17,99' }
+        ]);
+      }
+    };
+    window.addEventListener('DOMContentLoaded', () => App.init());
+  </script>
+</body>
+</html>
