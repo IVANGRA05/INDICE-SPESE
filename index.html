@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forensic Solo Burnrate Analyzer (Gist Cloud-Sync)</title>
+  <title>Forensic Solo Burnrate Auditor (Gist Cloud-Sync)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -15,8 +15,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; }
-    .privacy-blur .blur-target { filter: blur(6px); transition: filter 0.2s; user-select: none; }
-    .privacy-blur .blur-target:hover { filter: blur(0px); }
   </style>
 </head>
 <body class="bg-surface-900 text-slate-100 min-h-screen flex flex-col" id="app-root">
@@ -32,14 +30,14 @@
           <h1 class="font-bold text-sm tracking-tight flex items-center gap-2">
             Forensic Burnrate Auditor <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">GIST-CLOUD</span>
           </h1>
-          <p class="text-[11px] text-slate-400">Persistente ovunque via GitHub Gist • Cancella pure il PC</p>
+          <p class="text-[11px] text-slate-400">Ctrl+Shift+P Privacy Mask • Zero-Cloud</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
         <button onclick="App.openCloudModal()" class="px-3 py-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
           <i data-lucide="cloud" class="w-3.5 h-3.5"></i> Cloud Gist Sync
         </button>
-        <button onclick="App.togglePrivacyBlur()" title="Privacy Blur (Ctrl+Shift+P)" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-300 transition cursor-pointer">
+        <button onclick="App.togglePrivacyBlur()" title="Privacy Mask (Ctrl+Shift+P)" id="btn-blur" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-300 transition cursor-pointer flex items-center gap-1 text-xs">
           <i data-lucide="eye-off" id="blur-icon" class="w-4 h-4"></i>
         </button>
         <button onclick="App.loadSampleData()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition cursor-pointer">Demo Data</button>
@@ -51,14 +49,14 @@
   <div id="cloud-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
     <div class="bg-surface-800 border border-slate-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl text-xs">
       <h3 class="font-semibold text-sm">GitHub Gist Cloud Sync</h3>
-      <p class="text-slate-400">Salva/carica lo stato su un Gist GitHub. Indipendente dal PC, cancellabile in locale senza perdere nulla.</p>
+      <p class="text-slate-400">Salva/carica lo stato su un Gist GitHub. Indipendente dal PC.</p>
       <div class="space-y-2">
-        <label class="block text-slate-300 font-medium">Gist ID (es. c123456789...)</label>
+        <label class="block text-slate-300 font-medium">Gist ID</label>
         <input type="text" id="gist-id" placeholder="Incolla Gist ID qui..." class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
       </div>
       <div class="space-y-2">
-        <label class="block text-slate-300 font-medium">GitHub Token (opzionale, solo per Gist privati)</label>
-        <input type="password" id="gist-token" placeholder="ghp_... (lascia vuoto se pubblico)" class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
+        <label class="block text-slate-300 font-medium">GitHub Token (classic con scope gist)</label>
+        <input type="password" id="gist-token" placeholder="ghp_..." class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
       </div>
       <div class="flex gap-2 pt-2">
         <button onclick="App.saveToGist()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-medium text-white cursor-pointer">Salva su Gist</button>
@@ -81,24 +79,24 @@
         <i data-lucide="database-backup" class="w-6 h-6 text-indigo-400"></i>
         <div class="text-left">
           <p class="text-sm font-medium">Trascina CSV bancario (Revolut, Intesa, Amex, Generico)</p>
-          <p class="text-xs text-slate-500">Ricorda di fare "Salva su Gist" dopo l'import per renderlo indipendente dal PC!</p>
+          <p class="text-xs text-slate-500">Ricorda di fare "Salva su Gist" dopo l'import!</p>
         </div>
       </div>
     </div>
 
     <!-- Forensic KPI Matrix -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 privacy-blur">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
       <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
         <span class="text-[11px] text-slate-400">Liquidità Iniziale Est.</span>
-        <div class="text-lg font-bold mt-0.5 blur-target" id="kpi-basebal">€ 4.500,00</div>
+        <div class="text-lg font-bold mt-0.5" id="kpi-basebal">€ 4.500,00</div>
       </div>
       <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
         <span class="text-[11px] text-slate-400">True Disposable (Safe Burn)</span>
-        <div class="text-lg font-bold mt-0.5 text-emerald-400 blur-target" id="kpi-true-disposable">€ 0,00</div>
+        <div class="text-lg font-bold mt-0.5 text-emerald-400" id="kpi-true-disposable">€ 0,00</div>
       </div>
       <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
         <span class="text-[11px] text-slate-400">Burn Gior. Variabile (30g)</span>
-        <div class="text-lg font-bold mt-0.5 text-amber-400 blur-target" id="kpi-burnrate">€ 0,00/g</div>
+        <div class="text-lg font-bold mt-0.5 text-amber-400" id="kpi-burnrate">€ 0,00/g</div>
       </div>
       <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
         <span class="text-[11px] text-slate-400">Weekend vs Weekday Index</span>
@@ -107,7 +105,7 @@
       <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
         <span class="text-[11px] text-slate-400">Runway Reale</span>
         <div class="flex items-center gap-1.5 mt-0.5">
-          <span class="text-lg font-bold blur-target" id="kpi-runway">0 gg</span>
+          <span class="text-lg font-bold" id="kpi-runway">0 gg</span>
           <span id="kpi-runway-badge" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-700">N/D</span>
         </div>
       </div>
@@ -121,7 +119,7 @@
 
     <!-- Tab TX -->
     <div id="tab-tx" class="space-y-4">
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl overflow-x-auto privacy-blur">
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead class="bg-surface-900/50 text-slate-400 border-b border-slate-700/60">
             <tr>
@@ -167,12 +165,19 @@
       seenHashes: new Set(JSON.parse(localStorage.getItem('zc_hashes') || '[]')),
       overrides: JSON.parse(localStorage.getItem('zc_overrides') || '{}'),
       sinkingFunds: JSON.parse(localStorage.getItem('zc_sinking') || JSON.stringify([{ name: 'Assicurazione Auto', annual: 600 }])),
-      privacyBlurActive: false,
+      masked: localStorage.getItem('zc_masked') === 'true',
 
       init() {
         lucide.createIcons();
         document.getElementById('gist-id').value = localStorage.getItem('zc_gist_id') || '';
         document.getElementById('gist-token').value = localStorage.getItem('zc_gist_token') || '';
+        this.updateMaskButtonUI();
+        window.addEventListener('keydown', (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+            e.preventDefault();
+            this.togglePrivacyBlur();
+          }
+        });
         this.renderAll();
       },
 
@@ -181,6 +186,7 @@
         localStorage.setItem('zc_hashes', JSON.stringify(Array.from(this.seenHashes)));
         localStorage.setItem('zc_overrides', JSON.stringify(this.overrides));
         localStorage.setItem('zc_sinking', JSON.stringify(this.sinkingFunds));
+        localStorage.setItem('zc_masked', String(this.masked));
       },
 
       renderAll() {
@@ -189,6 +195,25 @@
         this.renderTxTable();
         this.renderSinkingFunds();
         this.saveStorage();
+      },
+
+      togglePrivacyBlur() {
+        this.masked = !this.masked;
+        this.updateMaskButtonUI();
+        this.renderAll();
+      },
+
+      updateMaskButtonUI() {
+        const icon = document.getElementById('blur-icon');
+        const btn = document.getElementById('btn-blur');
+        if (this.masked) {
+          icon.setAttribute('data-lucide', 'eye');
+          btn.classList.add('border-indigo-500', 'text-indigo-400');
+        } else {
+          icon.setAttribute('data-lucide', 'eye-off');
+          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+        }
+        lucide.createIcons();
       },
 
       openCloudModal() {
@@ -201,15 +226,6 @@
         const modal = document.getElementById('cloud-modal');
         modal.classList.remove('flex');
         modal.classList.add('hidden');
-      },
-
-      togglePrivacyBlur() {
-        this.privacyBlurActive = !this.privacyBlurActive;
-        const root = document.getElementById('app-root');
-        const icon = document.getElementById('blur-icon');
-        root.classList.toggle('privacy-blur', this.privacyBlurActive);
-        icon.setAttribute('data-lucide', this.privacyBlurActive ? 'eye' : 'eye-off');
-        lucide.createIcons();
       },
 
       getStatePayload() {
@@ -252,7 +268,7 @@
           if (json.id) {
             document.getElementById('gist-id').value = json.id;
             localStorage.setItem('zc_gist_id', json.id);
-            document.getElementById('cloud-status').innerText = 'Salvato su Gist con ID: ' + json.id;
+            document.getElementById('cloud-status').innerText = 'Salvato! ID: ' + json.id;
           } else { document.getElementById('cloud-status').innerText = 'Errore salvataggio Gist'; }
         } catch(e) { document.getElementById('cloud-status').innerText = 'Errore di rete'; }
       },
@@ -325,12 +341,10 @@
       renderKPIs() {
         const netFlow = this.processedTx.reduce((a, t) => a + t.amount, 0);
         const currentBalance = 4500.00 + netFlow;
-        document.getElementById('kpi-basebal').innerText = `€ ${currentBalance.toLocaleString('it-IT', {minimumFractionDigits: 2})}`;
         const varSpend30 = this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate') && !t.category.includes('Abbonamenti')).reduce((a, t) => a + Math.abs(t.amount), 0);
         const dailyBurn = varSpend30 / 30;
-        document.getElementById('kpi-burnrate').innerText = `€ ${dailyBurn.toFixed(2)}/g`;
-        const trueDisposable = Math.max(0, (currentBalance * 0.3) - 50 - 250);
-        document.getElementById('kpi-true-disposable').innerText = `€ ${trueDisposable.toFixed(2)}/mo`;
+        const annualSinking = this.sinkingFunds.reduce((a, sf) => a + sf.annual, 0);
+        const trueDisposable = Math.max(0, (currentBalance * 0.3) - (annualSinking/12) - 250);
 
         let weSpend = 0, wkSpend = 0;
         this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate')).forEach(t => {
@@ -338,10 +352,21 @@
           if (day === 0 || day === 6) weSpend += Math.abs(t.amount); else wkSpend += Math.abs(t.amount);
         });
         const wePct = (weSpend + wkSpend) > 0 ? Math.round((weSpend / (weSpend + wkSpend)) * 100) : 0;
-        document.getElementById('kpi-wknd-index').innerText = `${wePct}% WE`;
-
         const runwayDays = dailyBurn > 0 ? Math.round(currentBalance / dailyBurn) : 999;
-        document.getElementById('kpi-runway').innerText = runwayDays > 365 ? '365+ gg' : `${runwayDays} gg`;
+
+        if (this.masked) {
+          document.getElementById('kpi-basebal').innerText = '€ ••••,••';
+          document.getElementById('kpi-true-disposable').innerText = '€ ••••,••/mo';
+          document.getElementById('kpi-burnrate').innerText = '€ ••••,••/g';
+          document.getElementById('kpi-runway').innerText = '••• gg';
+        } else {
+          document.getElementById('kpi-basebal').innerText = `€ ${currentBalance.toLocaleString('it-IT', {minimumFractionDigits: 2})}`;
+          document.getElementById('kpi-true-disposable').innerText = `€ ${trueDisposable.toFixed(2)}/mo`;
+          document.getElementById('kpi-burnrate').innerText = `€ ${dailyBurn.toFixed(2)}/g`;
+          document.getElementById('kpi-runway').innerText = runwayDays > 365 ? '365+ gg' : `${runwayDays} gg`;
+        }
+
+        document.getElementById('kpi-wknd-index').innerText = `${wePct}% WE`;
         const badge = document.getElementById('kpi-runway-badge');
         badge.className = `px-1.5 py-0.5 rounded text-[9px] font-bold ${runwayDays < 30 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`;
         badge.innerText = runwayDays < 30 ? 'WARN' : 'SAFE';
@@ -349,20 +374,26 @@
 
       renderTxTable() {
         document.getElementById('count-tx').innerText = this.processedTx.length;
-        document.getElementById('tx-table-body').innerHTML = this.processedTx.map(t => `
-          <tr class="hover:bg-surface-800/50">
-            <td class="p-3 text-slate-400">${t.date}</td>
-            <td class="p-3 font-medium text-slate-100">${t.cleanMerchant}</td>
-            <td class="p-3">
-              <select class="bg-surface-900 border border-slate-700 rounded px-2 py-0.5 text-xs max-w-[200px]" onchange="App.setOverride('${t.id}', this.value)">
-                ${CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-              </select>
-            </td>
-            <td class="p-3 text-right font-mono ${t.amount >= 0 ? 'text-emerald-400' : 'text-slate-100'} blur-target">
-              ${t.amount.toLocaleString('it-IT', {style: 'currency', currency: 'EUR'})}
-            </td>
-          </tr>
-        `).join('');
+        document.getElementById('tx-table-body').innerHTML = this.processedTx.map(t => {
+          const amountText = this.masked 
+            ? '•••• €' 
+            : t.amount.toLocaleString('it-IT', {style: 'currency', currency: 'EUR'});
+          const amountColor = t.amount >= 0 ? 'text-emerald-400' : 'text-slate-100';
+          return `
+            <tr class="hover:bg-surface-800/50">
+              <td class="p-3 text-slate-400">${t.date}</td>
+              <td class="p-3 font-medium text-slate-100">${t.cleanMerchant}</td>
+              <td class="p-3">
+                <select class="bg-surface-900 border border-slate-700 rounded px-2 py-0.5 text-xs max-w-[200px]" onchange="App.setOverride('${t.id}', this.value)">
+                  ${CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                </select>
+              </td>
+              <td class="p-3 text-right font-mono ${amountColor}">
+                ${amountText}
+              </td>
+            </tr>
+          `;
+        }).join('');
       },
 
       setOverride(id, cat) { this.overrides[id] = cat; this.renderAll(); },
