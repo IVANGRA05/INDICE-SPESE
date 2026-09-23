@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forensic Solo Burnrate Auditor (Gist Cloud-Sync)</title>
+  <title>Forensic Solo Burnrate Auditor</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -14,131 +14,179 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', system-ui, sans-serif; }
+    
+    /* Custom Minimal Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Privacy Blur smooth transitions */
+    .privacy-blur .blur-target { filter: blur(6px); transition: filter 0.15s ease; user-select: none; opacity: 0.8; }
+    .privacy-blur .blur-target:hover { filter: blur(0px); opacity: 1; }
+
+    /* Input no-spinners */
+    input[type="number"]::-webkit-inner-spin-button, 
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+    /* Global Drag Overlay */
+    #global-drag-overlay { transition: opacity 0.2s, visibility 0.2s; }
+    body.dragging #global-drag-overlay { opacity: 1; visibility: visible; }
   </style>
 </head>
-<body class="bg-surface-900 text-slate-100 min-h-screen flex flex-col" id="app-root">
+<body class="bg-surface-900 text-slate-100 min-h-screen flex flex-col relative" id="app-root">
+
+  <!-- Global Drag Overlay -->
+  <div id="global-drag-overlay" class="fixed inset-0 bg-indigo-900/40 backdrop-blur-sm border-4 border-indigo-500 z-[100] opacity-0 invisible flex flex-col items-center justify-center pointer-events-none">
+    <div class="bg-surface-900 p-6 rounded-2xl shadow-2xl flex flex-col items-center border border-indigo-500/50">
+      <i data-lucide="upload-cloud" class="w-12 h-12 text-indigo-400 mb-3 animate-bounce"></i>
+      <h2 class="text-xl font-bold">Rilascia il CSV bancario qui</h2>
+      <p class="text-slate-400 text-sm mt-1">Verrà fuso automaticamente evitando i duplicati.</p>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Header -->
   <header class="border-b border-slate-800 bg-surface-900/90 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <div class="bg-indigo-600 p-2 rounded-xl text-white">
-          <i data-lucide="terminal" class="w-5 h-5"></i>
+        <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-900/20">
+          <i data-lucide="fingerprint" class="w-5 h-5"></i>
         </div>
         <div>
           <h1 class="font-bold text-sm tracking-tight flex items-center gap-2">
-            Forensic Burnrate Auditor <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">GIST-CLOUD</span>
+            Forensic Burnrate Auditor <span class="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium tracking-wide">ZERO-CLOUD</span>
           </h1>
-          <p class="text-[11px] text-slate-400">Ctrl+Shift+P Privacy Mask • Zero-Cloud</p>
+          <p class="text-[11px] text-slate-400">Masterpiece Edition • Dati sicuri nel tuo browser</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <button onclick="App.openCloudModal()" class="px-3 py-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
-          <i data-lucide="cloud" class="w-3.5 h-3.5"></i> Cloud Gist Sync
+        <button onclick="App.openCloudModal()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer text-slate-300">
+          <i data-lucide="cloud" class="w-3.5 h-3.5"></i> Gist Sync
         </button>
         <button onclick="App.togglePrivacyBlur()" title="Privacy Mask (Ctrl+Shift+P)" id="btn-blur" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-300 transition cursor-pointer flex items-center gap-1 text-xs">
           <i data-lucide="eye-off" id="blur-icon" class="w-4 h-4"></i>
         </button>
-        <button onclick="App.loadSampleData()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition cursor-pointer">Demo Data</button>
       </div>
     </div>
   </header>
 
   <!-- Cloud Gist Modal -->
   <div id="cloud-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-surface-800 border border-slate-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl text-xs">
-      <h3 class="font-semibold text-sm">GitHub Gist Cloud Sync</h3>
-      <p class="text-slate-400">Salva/carica lo stato su un Gist GitHub. Indipendente dal PC.</p>
-      <div class="space-y-2">
-        <label class="block text-slate-300 font-medium">Gist ID</label>
-        <input type="text" id="gist-id" placeholder="Incolla Gist ID qui..." class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
+    <div class="bg-surface-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl text-xs transform transition-all">
+      <div>
+        <h3 class="font-bold text-base text-slate-100 flex items-center gap-2"><i data-lucide="github" class="w-4 h-4"></i> GitHub Gist Sync</h3>
+        <p class="text-slate-400 mt-1">Sincronizza i dati ovunque in sicurezza. Nessun database di terze parti.</p>
       </div>
       <div class="space-y-2">
-        <label class="block text-slate-300 font-medium">GitHub Token (classic con scope gist)</label>
-        <input type="password" id="gist-token" placeholder="ghp_..." class="w-full bg-surface-900 border border-slate-700 rounded px-2 py-1.5 font-mono text-slate-200">
+        <label class="block text-slate-300 font-medium">Gist ID <span class="text-slate-500 font-normal">(lascia vuoto per crearne uno nuovo)</span></label>
+        <input type="text" id="gist-id" placeholder="Incolla l'ID qui..." class="w-full bg-surface-900 border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-2 font-mono text-slate-200 outline-none transition">
+      </div>
+      <div class="space-y-2">
+        <label class="block text-slate-300 font-medium">GitHub Token (Scope: gist)</label>
+        <input type="password" id="gist-token" placeholder="ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" class="w-full bg-surface-900 border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-2 font-mono text-slate-200 outline-none transition">
       </div>
       <div class="flex gap-2 pt-2">
-        <button onclick="App.saveToGist()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-medium text-white cursor-pointer">Salva su Gist</button>
-        <button onclick="App.loadFromGist()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium text-white cursor-pointer">Carica da Gist</button>
+        <button onclick="App.saveToGist()" class="flex-1 py-2.5 bg-emerald-600/90 hover:bg-emerald-500 rounded-lg font-medium text-white cursor-pointer transition shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i> Push
+        </button>
+        <button onclick="App.loadFromGist()" class="flex-1 py-2.5 bg-indigo-600/90 hover:bg-indigo-500 rounded-lg font-medium text-white cursor-pointer transition shadow-lg shadow-indigo-900/20 flex justify-center items-center gap-2">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i> Pull
+        </button>
       </div>
-      <div class="flex justify-between items-center text-slate-500 pt-2 border-t border-slate-700">
-        <span id="cloud-status">Pronto</span>
-        <button onclick="App.closeCloudModal()" class="text-slate-300 hover:underline cursor-pointer">Chiudi</button>
-      </div>
+      <button onclick="App.closeCloudModal()" class="w-full py-2 text-slate-400 hover:text-slate-200 transition cursor-pointer">Annulla</button>
     </div>
   </div>
 
   <!-- Main Container -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
-    <!-- Dropzone -->
-    <div id="dropzone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-5 bg-surface-800/40 text-center transition cursor-pointer"
-         ondragover="App.handleDragOver(event)" ondragleave="App.handleDragLeave(event)" ondrop="App.handleDrop(event)" onclick="document.getElementById('csvInput').click()">
-      <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="App.handleFileSelect(event)">
-      <div class="flex items-center justify-center gap-3">
-        <i data-lucide="database-backup" class="w-6 h-6 text-indigo-400"></i>
-        <div class="text-left">
-          <p class="text-sm font-medium">Trascina CSV bancario (Revolut, Intesa, Amex, Generico)</p>
-          <p class="text-xs text-slate-500">Ricorda di fare "Salva su Gist" dopo l'import!</p>
-        </div>
-      </div>
-    </div>
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-6 flex flex-col h-full">
+    
+    <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="App.handleFileSelect(event)">
 
     <!-- Forensic KPI Matrix -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
-        <span class="text-[11px] text-slate-400">Liquidità Iniziale Est.</span>
-        <div class="text-lg font-bold mt-0.5" id="kpi-basebal">€ 4.500,00</div>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <!-- Saldo Modificabile Inline -->
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 shadow-sm relative group">
+        <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Base Liquidità</span>
+        <div class="mt-1 flex items-center blur-target">
+          <span class="text-lg font-bold text-slate-400 mr-1">€</span>
+          <input type="number" id="base-balance-input" onchange="App.updateBaseBalance(this.value)" class="bg-transparent text-lg font-bold text-slate-100 w-full focus:outline-none focus:border-b border-indigo-500 transition cursor-pointer group-hover:bg-surface-700/30 rounded px-1 -ml-1">
+        </div>
+        <i data-lucide="edit-2" class="w-3 h-3 text-slate-600 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition"></i>
       </div>
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
-        <span class="text-[11px] text-slate-400">True Disposable (Safe Burn)</span>
-        <div class="text-lg font-bold mt-0.5 text-emerald-400" id="kpi-true-disposable">€ 0,00</div>
+      
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 shadow-sm">
+        <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1">True Disposable <i data-lucide="info" class="w-3 h-3 text-slate-500" title="Saldo reale - Sinking Funds"></i></span>
+        <div class="text-lg font-bold mt-1 text-emerald-400 blur-target tracking-tight" id="kpi-true-disposable">€ 0,00</div>
       </div>
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
-        <span class="text-[11px] text-slate-400">Burn Gior. Variabile (30g)</span>
-        <div class="text-lg font-bold mt-0.5 text-amber-400" id="kpi-burnrate">€ 0,00/g</div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 shadow-sm">
+        <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Burn Variabile (30g)</span>
+        <div class="text-lg font-bold mt-1 text-amber-400 blur-target tracking-tight" id="kpi-burnrate">€ 0,00 <span class="text-[11px] font-normal text-slate-500">/giorno</span></div>
       </div>
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
-        <span class="text-[11px] text-slate-400">Weekend vs Weekday Index</span>
-        <div class="text-lg font-bold mt-0.5 text-indigo-400" id="kpi-wknd-index">0% WE</div>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 shadow-sm">
+        <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Weekend Index</span>
+        <div class="text-lg font-bold mt-1 text-indigo-400 tracking-tight" id="kpi-wknd-index">0% <span class="text-[11px] font-normal text-slate-500">speso nel WE</span></div>
       </div>
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-3">
-        <span class="text-[11px] text-slate-400">Runway Reale</span>
-        <div class="flex items-center gap-1.5 mt-0.5">
-          <span class="text-lg font-bold" id="kpi-runway">0 gg</span>
-          <span id="kpi-runway-badge" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-700">N/D</span>
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 shadow-sm">
+        <span class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Runway (Safe)</span>
+        <div class="flex items-center gap-2 mt-1 blur-target">
+          <span class="text-lg font-bold tracking-tight" id="kpi-runway">0 gg</span>
+          <span id="kpi-runway-badge" class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide">N/D</span>
         </div>
       </div>
     </div>
 
     <!-- Tabs -->
-    <div class="flex border-b border-slate-800 space-x-6 text-sm font-medium">
-      <button class="pb-3 border-b-2 border-indigo-500 text-white cursor-pointer" onclick="App.switchTab('tx', this)">Transazioni & Dedup (<span id="count-tx">0</span>)</button>
-      <button class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 cursor-pointer" onclick="App.switchTab('forensic', this)">Forensic & Sinking Funds</button>
+    <div class="flex border-b border-slate-800 space-x-6 text-sm font-medium mt-2">
+      <button class="pb-3 border-b-2 border-indigo-500 text-white cursor-pointer transition-colors" onclick="App.switchTab('tx', this)">Transazioni (<span id="count-tx">0</span>)</button>
+      <button class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 cursor-pointer transition-colors" onclick="App.switchTab('forensic', this)">Sinking Funds & Settings</button>
     </div>
 
     <!-- Tab TX -->
-    <div id="tab-tx" class="space-y-4">
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead class="bg-surface-900/50 text-slate-400 border-b border-slate-700/60">
+    <div id="tab-tx" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <!-- Filter Bar -->
+      <div class="flex justify-between items-center mb-3">
+        <button onclick="document.getElementById('csvInput').click()" class="px-3 py-1.5 text-xs bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-lg transition flex items-center gap-1.5">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i> Importa CSV
+        </button>
+        <span class="text-[11px] text-slate-500" id="dedup-stats-label">Nessun duplicato scartato</span>
+      </div>
+      
+      <!-- Table Container (Scrollable with Sticky Header) -->
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl flex-1 overflow-auto privacy-blur relative shadow-inner">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+          <thead class="bg-surface-900/95 backdrop-blur text-slate-400 sticky top-0 z-10 shadow-sm">
             <tr>
-              <th class="p-3">Data</th>
-              <th class="p-3">Merchant Normalizzato</th>
-              <th class="p-3">Categoria Granulare</th>
-              <th class="p-3 text-right">Importo</th>
+              <th class="p-3 font-semibold w-24">Data</th>
+              <th class="p-3 font-semibold">Merchant / Descrizione</th>
+              <th class="p-3 font-semibold w-64">Categoria Logica</th>
+              <th class="p-3 font-semibold text-right w-32">Importo</th>
             </tr>
           </thead>
-          <tbody id="tx-table-body" class="divide-y divide-slate-700/40"></tbody>
+          <tbody id="tx-table-body" class="divide-y divide-slate-700/40">
+            <!-- Empty state renders here or rows -->
+          </tbody>
         </table>
       </div>
     </div>
 
     <!-- Tab Forensic -->
-    <div id="tab-forensic" class="hidden space-y-4">
-      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-4 space-y-3">
-        <h3 class="font-semibold text-sm">Envelope Accrual (Sinking Funds Annuali)</h3>
+    <div id="tab-forensic" class="hidden space-y-4 flex-1">
+      <div class="bg-surface-800 border border-slate-700/60 rounded-xl p-5 space-y-4 max-w-2xl">
+        <div>
+          <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2"><i data-lucide="piggy-bank" class="w-4 h-4 text-indigo-400"></i> Envelope Accrual (Sinking Funds)</h3>
+          <p class="text-[11px] text-slate-400 mt-1">Sottrae automaticamente accantonamenti annuali certi dal tuo "True Disposable" mensile, così non ti illudi di avere troppa liquidità.</p>
+        </div>
         <div id="sinking-list" class="space-y-2 text-xs"></div>
+        <div class="flex gap-2 pt-4 border-t border-slate-700/60">
+          <input type="text" id="sf-name" placeholder="Es: Tagliando Auto" class="flex-1 bg-surface-900 border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs outline-none transition">
+          <input type="number" id="sf-annual" placeholder="€ / anno" class="w-24 bg-surface-900 border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs outline-none transition text-right">
+          <button onclick="App.addSinkingFund()" class="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition cursor-pointer">Aggiungi</button>
+        </div>
       </div>
     </div>
   </main>
@@ -153,40 +201,83 @@
       'Investimenti / Broker / Crypto', 'Donazioni / Beneficenza', 'Entrate Stipendio / Salario',
       'Entrate Extra / Rimborsi / Cashback', 'Altro / Varie'
     ];
+    
     const DEFAULT_RULES = [
       { pattern: /AMZN|AMAZON/i, merchant: 'Amazon', cat: 'Casa / Arredo / Elettrodomestici / Fai da te' },
       { pattern: /NETFLIX/i, merchant: 'Netflix', cat: 'Abbonamenti Streaming / Media' },
       { pattern: /SPOTIFY/i, merchant: 'Spotify', cat: 'Abbonamenti Streaming / Media' },
-      { pattern: /ESSELUNGA|COOP|CARREFOUR|CONAD/i, merchant: 'Supermercato', cat: 'Alimentari / Spesa' }
+      { pattern: /ESSELUNGA|COOP|CARREFOUR|CONAD|PAM|LIDL/i, merchant: 'Supermercato', cat: 'Alimentari / Spesa' }
     ];
 
     const App = {
       transactions: JSON.parse(localStorage.getItem('zc_tx') || '[]'),
       seenHashes: new Set(JSON.parse(localStorage.getItem('zc_hashes') || '[]')),
+      discardedDupCount: parseInt(localStorage.getItem('zc_dupcount') || '0', 10),
       overrides: JSON.parse(localStorage.getItem('zc_overrides') || '{}'),
-      sinkingFunds: JSON.parse(localStorage.getItem('zc_sinking') || JSON.stringify([{ name: 'Assicurazione Auto', annual: 600 }])),
+      sinkingFunds: JSON.parse(localStorage.getItem('zc_sinking') || JSON.stringify([{ name: 'Assicurazione Auto (Esempio)', annual: 500 }])),
       masked: localStorage.getItem('zc_masked') === 'true',
+      baseBalance: parseFloat(localStorage.getItem('zc_basebal') || '4500.00'),
 
       init() {
         lucide.createIcons();
         document.getElementById('gist-id').value = localStorage.getItem('zc_gist_id') || '';
         document.getElementById('gist-token').value = localStorage.getItem('zc_gist_token') || '';
+        document.getElementById('base-balance-input').value = this.baseBalance;
+        
         this.updateMaskButtonUI();
+        this.setupGlobalDrag();
+
         window.addEventListener('keydown', (e) => {
           if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
             e.preventDefault();
             this.togglePrivacyBlur();
           }
         });
+        
         this.renderAll();
+      },
+
+      setupGlobalDrag() {
+        let dragCounter = 0;
+        window.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; document.body.classList.add('dragging'); });
+        window.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) document.body.classList.remove('dragging'); });
+        window.addEventListener('dragover', (e) => { e.preventDefault(); });
+        window.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dragCounter = 0;
+          document.body.classList.remove('dragging');
+          if (e.dataTransfer.files[0]) this.parseFile(e.dataTransfer.files[0]);
+        });
+      },
+
+      showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const color = type === 'success' ? 'border-emerald-500 text-emerald-400 bg-emerald-950/80' : 'border-rose-500 text-rose-400 bg-rose-950/80';
+        toast.className = `px-4 py-3 rounded-xl border ${color} shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-medium transform transition-all duration-300 translate-y-4 opacity-0`;
+        const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+        toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i> ${message}`;
+        container.appendChild(toast);
+        lucide.createIcons();
+        
+        // Animate in
+        requestAnimationFrame(() => { toast.classList.remove('translate-y-4', 'opacity-0'); });
+        
+        // Remove after 3s
+        setTimeout(() => {
+          toast.classList.add('translate-y-4', 'opacity-0');
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
       },
 
       saveStorage() {
         localStorage.setItem('zc_tx', JSON.stringify(this.transactions));
         localStorage.setItem('zc_hashes', JSON.stringify(Array.from(this.seenHashes)));
+        localStorage.setItem('zc_dupcount', this.discardedDupCount.toString());
         localStorage.setItem('zc_overrides', JSON.stringify(this.overrides));
         localStorage.setItem('zc_sinking', JSON.stringify(this.sinkingFunds));
         localStorage.setItem('zc_masked', String(this.masked));
+        localStorage.setItem('zc_basebal', String(this.baseBalance));
       },
 
       renderAll() {
@@ -195,6 +286,12 @@
         this.renderTxTable();
         this.renderSinkingFunds();
         this.saveStorage();
+      },
+
+      updateBaseBalance(val) {
+        this.baseBalance = parseFloat(val) || 0;
+        this.renderAll();
+        this.showToast('Base liquidità aggiornata');
       },
 
       togglePrivacyBlur() {
@@ -208,40 +305,28 @@
         const btn = document.getElementById('btn-blur');
         if (this.masked) {
           icon.setAttribute('data-lucide', 'eye');
-          btn.classList.add('border-indigo-500', 'text-indigo-400');
+          btn.classList.add('bg-indigo-900/50', 'border-indigo-500/50', 'text-indigo-400');
         } else {
           icon.setAttribute('data-lucide', 'eye-off');
-          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+          btn.classList.remove('bg-indigo-900/50', 'border-indigo-500/50', 'text-indigo-400');
         }
         lucide.createIcons();
       },
 
-      openCloudModal() {
-        const modal = document.getElementById('cloud-modal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      },
-
-      closeCloudModal() {
-        const modal = document.getElementById('cloud-modal');
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-      },
+      openCloudModal() { document.getElementById('cloud-modal').classList.remove('hidden'); document.getElementById('cloud-modal').classList.add('flex'); },
+      closeCloudModal() { document.getElementById('cloud-modal').classList.remove('flex'); document.getElementById('cloud-modal').classList.add('hidden'); },
 
       getStatePayload() {
-        return {
-          transactions: this.transactions,
-          seenHashes: Array.from(this.seenHashes),
-          overrides: this.overrides,
-          sinkingFunds: this.sinkingFunds
-        };
+        return { transactions: this.transactions, seenHashes: Array.from(this.seenHashes), discardedDupCount: this.discardedDupCount, overrides: this.overrides, sinkingFunds: this.sinkingFunds, baseBalance: this.baseBalance };
       },
 
       applyStatePayload(data) {
         if (data.transactions) this.transactions = data.transactions;
         if (data.seenHashes) this.seenHashes = new Set(data.seenHashes);
+        if (data.discardedDupCount !== undefined) this.discardedDupCount = data.discardedDupCount;
         if (data.overrides) this.overrides = data.overrides;
         if (data.sinkingFunds) this.sinkingFunds = data.sinkingFunds;
+        if (data.baseBalance) { this.baseBalance = data.baseBalance; document.getElementById('base-balance-input').value = this.baseBalance; }
         this.renderAll();
       },
 
@@ -250,54 +335,47 @@
         const token = document.getElementById('gist-token').value.trim();
         localStorage.setItem('zc_gist_id', gistId);
         localStorage.setItem('zc_gist_token', token);
-        if (!token) { alert('Per salvare su Gist serve un token GitHub (ghp_...) con permessi gist.'); return; }
-        document.getElementById('cloud-status').innerText = 'Salvataggio in corso...';
+        if (!token) { this.showToast('Token GitHub obbligatorio', 'error'); return; }
+        
         try {
-          const body = {
-            description: 'Burnrate Analyzer Cloud Backup',
-            files: { 'burnrate_backup.json': { content: JSON.stringify(this.getStatePayload(), null, 2) } }
-          };
-          const url = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
-          const method = gistId ? 'PATCH' : 'POST';
-          const res = await fetch(url, {
-            method,
-            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+          const body = { description: 'Burnrate Analyzer Backup', files: { 'burnrate_backup.json': { content: JSON.stringify(this.getStatePayload(), null, 2) } } };
+          const res = await fetch(gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists', {
+            method: gistId ? 'PATCH' : 'POST',
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
             body: JSON.stringify(body)
           });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = await res.json();
-          if (json.id) {
-            document.getElementById('gist-id').value = json.id;
-            localStorage.setItem('zc_gist_id', json.id);
-            document.getElementById('cloud-status').innerText = 'Salvato! ID: ' + json.id;
-          } else { document.getElementById('cloud-status').innerText = 'Errore salvataggio Gist'; }
-        } catch(e) { document.getElementById('cloud-status').innerText = 'Errore di rete'; }
+          document.getElementById('gist-id').value = json.id;
+          localStorage.setItem('zc_gist_id', json.id);
+          this.closeCloudModal();
+          this.showToast('Backup salvato su cloud!', 'success');
+        } catch(e) { this.showToast(`Errore Push: ${e.message}`, 'error'); }
       },
 
       async loadFromGist() {
         const gistId = document.getElementById('gist-id').value.trim();
         const token = document.getElementById('gist-token').value.trim();
-        if (!gistId) { alert('Inserisci un Gist ID'); return; }
-        document.getElementById('cloud-status').innerText = 'Caricamento da Gist...';
+        if (!gistId) { this.showToast('Gist ID obbligatorio per il Pull', 'error'); return; }
+        
         try {
-          const headers = token ? { 'Authorization': `token ${token}` } : {};
-          const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
+          const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: token ? { 'Authorization': `token ${token}` } : {} });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = await res.json();
           const file = json.files && json.files['burnrate_backup.json'];
           if (file) {
-            const data = JSON.parse(file.content);
-            this.applyStatePayload(data);
-            document.getElementById('cloud-status').innerText = 'Caricato con successo!';
-          } else { document.getElementById('cloud-status').innerText = 'File non trovato nel Gist'; }
-        } catch(e) { document.getElementById('cloud-status').innerText = 'Errore caricamento'; }
+            this.applyStatePayload(JSON.parse(file.content));
+            this.closeCloudModal();
+            this.showToast('Dati caricati dal cloud!', 'success');
+          } else { throw new Error('File JSON non trovato nel Gist'); }
+        } catch(e) { this.showToast(`Errore Pull: ${e.message}`, 'error'); }
       },
 
       handleFileSelect(e) { if (e.target.files[0]) this.parseFile(e.target.files[0]); },
-      handleDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('border-indigo-500'); },
-      handleDragLeave(e) { document.getElementById('dropzone').classList.remove('border-indigo-500'); },
-      handleDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('border-indigo-500'); if (e.dataTransfer.files[0]) this.parseFile(e.dataTransfer.files[0]); },
       parseFile(file) { Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => this.ingestRawRows(res.data) }); },
 
       ingestRawRows(rows) {
+        let added = 0;
         rows.forEach(r => {
           const dateStr = r['Data Contabile'] || r['Completed Date'] || r['Data'] || Object.values(r)[0];
           const rawDesc = r['Descrizione Operazione'] || r['Description'] || r['Descrizione'] || Object.values(r)[1] || '';
@@ -308,9 +386,14 @@
           if (!this.seenHashes.has(signature)) {
             this.seenHashes.add(signature);
             this.transactions.push({ id: 'tx_' + Math.random().toString(36).substr(2,7), date: normDate, rawDesc, amount: normAmt });
+            added++;
+          } else {
+            this.discardedDupCount++;
           }
         });
         this.renderAll();
+        if (added > 0) this.showToast(`Importate ${added} transazioni`);
+        else this.showToast(`Nessuna transazione nuova (duplicati scartati)`, 'error');
       },
 
       normNumber(val) {
@@ -324,6 +407,13 @@
         if (!d) return '1970-01-01';
         if (d.includes('/')) { const p = d.split('/'); if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; }
         return d.substring(0,10);
+      },
+      formatDateFriendly(d) {
+        if(!d) return '';
+        const months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+        const p = d.split('-');
+        if(p.length !== 3) return d;
+        return `${parseInt(p[2])} ${months[parseInt(p[1])-1]} '${p[0].substring(2)}`;
       },
       stripNoise(desc) { return desc.replace(/POS C\/O\s+/gi, '').replace(/LUX|IT\*\w+/gi, '').trim(); },
 
@@ -340,11 +430,11 @@
 
       renderKPIs() {
         const netFlow = this.processedTx.reduce((a, t) => a + t.amount, 0);
-        const currentBalance = 4500.00 + netFlow;
+        const currentBalance = this.baseBalance + netFlow;
         const varSpend30 = this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate') && !t.category.includes('Abbonamenti')).reduce((a, t) => a + Math.abs(t.amount), 0);
         const dailyBurn = varSpend30 / 30;
         const annualSinking = this.sinkingFunds.reduce((a, sf) => a + sf.annual, 0);
-        const trueDisposable = Math.max(0, (currentBalance * 0.3) - (annualSinking/12) - 250);
+        const trueDisposable = Math.max(0, (currentBalance) - (annualSinking/12)); // Removed hardcoded 250 utenze for purer math
 
         let weSpend = 0, wkSpend = 0;
         this.processedTx.filter(t => t.amount < 0 && !t.category.includes('Entrate')).forEach(t => {
@@ -355,41 +445,60 @@
         const runwayDays = dailyBurn > 0 ? Math.round(currentBalance / dailyBurn) : 999;
 
         if (this.masked) {
-          document.getElementById('kpi-basebal').innerText = '€ ••••,••';
           document.getElementById('kpi-true-disposable').innerText = '€ ••••,••/mo';
-          document.getElementById('kpi-burnrate').innerText = '€ ••••,••/g';
+          document.getElementById('kpi-burnrate').innerHTML = '€ ••••,•• <span class="text-[11px] font-normal text-slate-500">/giorno</span>';
           document.getElementById('kpi-runway').innerText = '••• gg';
         } else {
-          document.getElementById('kpi-basebal').innerText = `€ ${currentBalance.toLocaleString('it-IT', {minimumFractionDigits: 2})}`;
-          document.getElementById('kpi-true-disposable').innerText = `€ ${trueDisposable.toFixed(2)}/mo`;
-          document.getElementById('kpi-burnrate').innerText = `€ ${dailyBurn.toFixed(2)}/g`;
+          document.getElementById('kpi-true-disposable').innerText = `€ ${trueDisposable.toLocaleString('it-IT', {minimumFractionDigits: 2})}`;
+          document.getElementById('kpi-burnrate').innerHTML = `€ ${dailyBurn.toFixed(2)} <span class="text-[11px] font-normal text-slate-500">/giorno</span>`;
           document.getElementById('kpi-runway').innerText = runwayDays > 365 ? '365+ gg' : `${runwayDays} gg`;
         }
 
-        document.getElementById('kpi-wknd-index').innerText = `${wePct}% WE`;
+        document.getElementById('kpi-wknd-index').innerHTML = `${wePct}% <span class="text-[11px] font-normal text-slate-500">speso nel WE</span>`;
         const badge = document.getElementById('kpi-runway-badge');
-        badge.className = `px-1.5 py-0.5 rounded text-[9px] font-bold ${runwayDays < 30 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`;
+        badge.className = `px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${runwayDays < 30 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`;
         badge.innerText = runwayDays < 30 ? 'WARN' : 'SAFE';
+        
+        document.getElementById('dedup-stats-label').innerText = this.discardedDupCount > 0 ? `${this.discardedDupCount} duplicati scartati dal motore` : 'Nessun duplicato';
       },
 
       renderTxTable() {
         document.getElementById('count-tx').innerText = this.processedTx.length;
-        document.getElementById('tx-table-body').innerHTML = this.processedTx.map(t => {
-          const amountText = this.masked 
-            ? '•••• €' 
-            : t.amount.toLocaleString('it-IT', {style: 'currency', currency: 'EUR'});
-          const amountColor = t.amount >= 0 ? 'text-emerald-400' : 'text-slate-100';
+        const tbody = document.getElementById('tx-table-body');
+        
+        if (this.processedTx.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="4" class="p-12 text-center text-slate-500">
+                <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-3 text-slate-700"></i>
+                <p class="font-medium text-slate-400">Nessun dato caricato.</p>
+                <p class="text-xs mt-1">Trascina un file CSV bancario per iniziare.</p>
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        tbody.innerHTML = this.processedTx.map(t => {
+          const amountText = this.masked ? '•••• €' : t.amount.toLocaleString('it-IT', {style: 'currency', currency: 'EUR'});
+          const amountColor = t.amount >= 0 ? 'text-emerald-400 font-semibold' : 'text-slate-100 font-medium';
+          const signStr = (t.amount > 0 && !this.masked) ? '+' : '';
+          
           return `
-            <tr class="hover:bg-surface-800/50">
-              <td class="p-3 text-slate-400">${t.date}</td>
-              <td class="p-3 font-medium text-slate-100">${t.cleanMerchant}</td>
+            <tr class="hover:bg-surface-700/30 transition-colors group">
+              <td class="p-3 text-slate-400 text-[11px] uppercase tracking-wide font-medium">${this.formatDateFriendly(t.date)}</td>
+              <td class="p-3 font-medium text-slate-200">
+                <div class="truncate max-w-[250px]" title="${t.rawDesc}">${t.cleanMerchant}</div>
+                <div class="text-[9px] text-slate-500 truncate max-w-[250px] opacity-0 group-hover:opacity-100 transition-opacity absolute mt-1">${t.rawDesc}</div>
+              </td>
               <td class="p-3">
-                <select class="bg-surface-900 border border-slate-700 rounded px-2 py-0.5 text-xs max-w-[200px]" onchange="App.setOverride('${t.id}', this.value)">
+                <select class="bg-surface-900/50 border border-slate-700/50 hover:border-indigo-500/50 rounded-lg px-2 py-1.5 text-[11px] max-w-[200px] outline-none transition cursor-pointer text-slate-300 appearance-none" onchange="App.setOverride('${t.id}', this.value)">
                   ${CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
                 </select>
               </td>
-              <td class="p-3 text-right font-mono ${amountColor}">
-                ${amountText}
+              <td class="p-3 text-right tabular-nums ${amountColor} blur-target text-sm">
+                ${signStr}${amountText}
               </td>
             </tr>
           `;
@@ -397,24 +506,64 @@
       },
 
       setOverride(id, cat) { this.overrides[id] = cat; this.renderAll(); },
+      
       renderSinkingFunds() {
-        document.getElementById('sinking-list').innerHTML = this.sinkingFunds.map(sf => `
-          <div class="flex justify-between items-center bg-surface-900/60 p-2 rounded border border-slate-700/40">
-            <span>${sf.name}</span><span class="font-mono text-indigo-400">€ ${sf.annual}/yr</span>
+        document.getElementById('sinking-list').innerHTML = this.sinkingFunds.map((sf, idx) => `
+          <div class="flex justify-between items-center bg-surface-900/40 p-3 rounded-lg border border-slate-700/40 hover:border-slate-600 transition group">
+            <span class="font-medium text-slate-200">${sf.name}</span>
+            <div class="flex items-center gap-4">
+              <span class="font-mono text-indigo-400 tabular-nums">€ ${sf.annual.toLocaleString('it-IT')}/yr</span>
+              <button onclick="App.removeSinkingFund(${idx})" class="text-rose-500/50 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
           </div>
         `).join('');
+        lucide.createIcons();
       },
+      addSinkingFund() {
+        const name = document.getElementById('sf-name').value.trim();
+        const annual = parseFloat(document.getElementById('sf-annual').value);
+        if (!name || isNaN(annual)) return;
+        this.sinkingFunds.push({ name, annual });
+        document.getElementById('sf-name').value = ''; document.getElementById('sf-annual').value = '';
+        this.renderAll();
+        this.showToast('Accantonamento aggiunto');
+      },
+      removeSinkingFund(idx) {
+        this.sinkingFunds.splice(idx, 1);
+        this.renderAll();
+      },
+      
       switchTab(id) {
-        ['tx', 'forensic'].forEach(t => document.getElementById('tab-' + t).classList.add('hidden'));
-        document.getElementById('tab-' + id).classList.remove('hidden');
+        ['tx', 'forensic'].forEach(t => document.getElementById('tab-' + t).classList.add('hidden', 'opacity-0'));
+        
+        const activeTab = document.getElementById('tab-' + id);
+        activeTab.classList.remove('hidden');
+        
+        // Micro-animazione
+        requestAnimationFrame(() => {
+          activeTab.classList.add('flex-1');
+          activeTab.classList.remove('opacity-0');
+          activeTab.style.transition = "opacity 0.2s ease";
+        });
+
+        // Gestione stili pulsanti navigazione
+        document.querySelectorAll('header ~ main > div.flex > button').forEach(btn => {
+          btn.classList.remove('border-indigo-500', 'text-white');
+          btn.classList.add('border-transparent', 'text-slate-400');
+        });
+        event.currentTarget.classList.remove('border-transparent', 'text-slate-400');
+        event.currentTarget.classList.add('border-indigo-500', 'text-white');
       },
+      
       loadSampleData() {
         this.ingestRawRows([
-          { 'Data Contabile': '15/09/2026', 'Descrizione Operazione': 'POS C/O ESSELUNGA MILANO LUX', 'Importo': '-84,50' },
-          { 'Data Contabile': '12/09/2026', 'Descrizione Operazione': 'NETFLIX.COM PAYMENT', 'Importo': '-17,99' }
+          { 'Data Contabile': '23/09/2026', 'Descrizione Operazione': 'POS C/O ESSELUNGA MILANO LUX', 'Importo': '-84,50' },
+          { 'Data Contabile': '12/09/2026', 'Descrizione Operazione': 'NETFLIX.COM PAYMENT', 'Importo': '-17,99' },
+          { 'Data Contabile': '02/09/2026', 'Descrizione Operazione': 'ACCREDITO STIPENDIO AZIENDA SPA', 'Importo': '2850,00' }
         ]);
       }
     };
+    
     window.addEventListener('DOMContentLoaded', () => App.init());
   </script>
 </body>
